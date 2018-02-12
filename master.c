@@ -5,8 +5,9 @@
  */
 
 /* 
- * File:   main.c
- * Author: Jodicus
+ * File:   master.c
+ * Author: Michael Beckering
+ * Created: Monday, Feb 12, 2018
  *
  * Created on February 12, 2018, 10:19 AM
  */
@@ -48,17 +49,18 @@ int main(int argc, char** argv) {
     }
     
     else if ( (nflag == 1) && (hflag == 0) ) {
-        //...IF a positive int was entered, assign to pr_limit
+        //if no argument, use default of 10 processes
         if ( argv[2] == NULL ) {
             n = 10;
             printf("%s: Proceeding with default of %d consumer processes\n",
                     argv[0], n);
         }
-        //otherwise continue with default of 10 process limit
+        //continue with argument if it's positive
         else if (( n = atoi(argv[2])) >= 1) {
             printf("%s: Proceeding with %d consumer processes\n",
                     argv[0], n);
         }
+        //otherwise exit with error message
         else {
             printf("%s: Error: Non-zero argument required for option -n\n", argv[0]);
             return 0;
@@ -66,13 +68,11 @@ int main(int argc, char** argv) {
         //MAIN LOOP HERE
     }
     
+    //if no options are selected, print usage and exit
     else {
         printf("Usage: %s -n <# of processes>\n", argv[0]);
         return 0;
     }
-    
-    
-            
 
     return (EXIT_SUCCESS);
 }
