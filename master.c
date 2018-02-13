@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <string.h>
 
 /*
  * 
@@ -77,15 +78,24 @@ int main(int argc, char** argv) {
         //fork consumer(s), max 18 at a time
         
         for (i=0; i<n; i++) {
+            //printf("i=%d, proc_count=%d\n", i, proc_count);
             while (proc_count == proc_limit) {
                 if ( waitpid(-1, &wstatus, WNOHANG) < 0 ) {
                     proc_count--;
                     printf("%s: child termination detected, proc_count decremented to %d\n", argv[0], proc_count);
                 }
             }
-            if ( (consumerpid = fork()) <=0 ){ //child code
-                execl("./consumer", NULL);
-                printf("%s: consumer %d shutting down.\n", argv[0], n);
+            if ( (consumerpid = fork()) < 0 ){ //terminate code
+                perror("Error forking child");
+                return 1;
+            }
+            if (consumerpid ==0) { //child code
+                char arg[4];
+                sprintf(arg, "%d", i+1);
+                //printf("forked with i=%d, arg=%s.\n", i+1, arg);
+                //execlp("./consumer", arg, NULL);
+                execlp("./consumer", "./consumer", arg, (char *)NULL);
+                perror("execl() failure: ");
                 return 1;
             }
             proc_count++;
@@ -102,7 +112,5 @@ int main(int argc, char** argv) {
     while ( (wpid = wait(&status)) > 0); //wait for all children to finish
     printf("%s: shutting down: normal.\n", argv[0]);
 
-    return 1;
+    return 0;
 }
-
-
