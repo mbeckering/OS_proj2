@@ -10,7 +10,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <string.h>
+
+#define SHMKEY 859047
+#define BUFF_SZ sizeof (int)
 
 /*
  * 
@@ -18,7 +24,9 @@
 int main(int argc, char** argv) {
     
     //initialize variables
+    char * paddr;
     int option;
+    int shmid;
     int hflag = 0;
     int nflag = 0;
     int status = 0; //status holder for children processes
@@ -69,36 +77,56 @@ int main(int argc, char** argv) {
         
         //MAIN STUFF HERE*******************************************************
         
+        //create and attach to shared memory before forking
+        shmid = shmget(SHMKEY, BUFF_SZ, 0777 | IPC_CREAT);
+        printf("shmid = %d\n", shmid);
+        if (shmid == -1) { //terminate if shmget failed
+            perror("Error in shmget");
+            return 1;
+        }
+                
+        //get pointer to the shared block ** NECESSARY in master??
+        paddr = (char*)(shmat (shmid, 0, 0) );
+        int * pint = (int*) (paddr);
+        *pint = 420;
+        printf("pint = %d\n", (int)*pint);
+        
         //fork producer
-        if ( (producerpid = fork()) <=0 ){ //child code
+        if ( (producerpid = fork()) <0 ){ //terminate code
+            perror("error forking producer");
+            return 1;
+        }
+        if ( producerpid == 0 ) { //producer child code
             execl("./producer", NULL);
+            perror("execl() failure on producer");
             return 1;
         }
         
         //fork consumer(s), max 18 at a time
-        
         for (i=0; i<n; i++) {
             //printf("i=%d, proc_count=%d\n", i, proc_count);
-            while (proc_count == proc_limit) {
-                if ( waitpid(-1, &wstatus, WNOHANG) < 0 ) {
-                    proc_count--;
-                    printf("%s: child termination detected, proc_count decremented to %d\n", argv[0], proc_count);
+            while (proc_count == proc_limit) { //if max # of processes is reached...
+                if ( waitpid(-1, &wstatus, WNOHANG) < 0 ) { //...wait for any child to finish
+                    proc_count--; //then decrement process count, report and proceed
+                    printf("%s: child termination detected, proc_count "
+                            "decremented to %d\n", argv[0], proc_count);
                 }
             }
             if ( (consumerpid = fork()) < 0 ){ //terminate code
                 perror("Error forking child");
                 return 1;
             }
-            if (consumerpid ==0) { //child code
-                char arg[4];
+            if (consumerpid == 0) { //child code
+                char arg[10];
                 sprintf(arg, "%d", i+1);
-                //printf("forked with i=%d, arg=%s.\n", i+1, arg);
-                //execlp("./consumer", arg, NULL);
                 execlp("./consumer", "./consumer", arg, (char *)NULL);
-                perror("execl() failure: ");
+                perror("execl() failure on consumer");
                 return 1;
             }
+            //parent code proceeds
             proc_count++;
+            printf("proc_count incremented to %d\n", proc_count);
+            
         }
         
         //END MAIN STUFF_*******************************************************
@@ -110,7 +138,15 @@ int main(int argc, char** argv) {
     }
     
     while ( (wpid = wait(&status)) > 0); //wait for all children to finish
+    
+    //detach shared memory
+    if ( shmdt(paddr) == -1) {
+        perror("shmdt error");
+        return 1;
+    }
+    
     printf("%s: shutting down: normal.\n", argv[0]);
-
     return 0;
 }
+
+
