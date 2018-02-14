@@ -12,8 +12,9 @@
  * 
  */
 int main(int argc, char** argv) {
-    
     printf("producer launched: pid: %ld\n", getpid());
+    
+    
     printf("producer shutting down. pid: %ld\n", getpid());
 
     return (EXIT_SUCCESS);

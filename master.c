@@ -16,6 +16,7 @@
 #include <string.h>
 
 #define SHMKEY 859047
+#define SHMKEY2 859050
 #define BUFF_SZ sizeof (int)
 
 /*
@@ -24,9 +25,10 @@
 int main(int argc, char** argv) {
     
     //initialize variables
-    char * paddr;
+    char * turn_paddr;
+    char * flagarr_paddr;
     int option;
-    int shmid;
+    int shmid_turn, shmid_flagarr;
     int hflag = 0;
     int nflag = 0;
     int status = 0; //status holder for children processes
@@ -77,19 +79,41 @@ int main(int argc, char** argv) {
         
         //MAIN STUFF HERE*******************************************************
         
-        //create and attach to shared memory before forking
-        shmid = shmget(SHMKEY, BUFF_SZ, 0777 | IPC_CREAT);
-        printf("shmid = %d\n", shmid);
-        if (shmid == -1) { //terminate if shmget failed
+        //create and attach to shared memory for turn variable
+        shmid_turn = shmget(SHMKEY, BUFF_SZ, 0777 | IPC_CREAT);
+        printf("shmid_turn = %d\n", shmid_turn);
+        if (shmid_turn == -1) { //terminate if shmget failed
             perror("Error in shmget");
             return 1;
         }
-                
-        //get pointer to the shared block ** NECESSARY in master??
-        paddr = (char*)(shmat (shmid, 0, 0) );
-        int * pint = (int*) (paddr);
-        *pint = 420;
-        printf("pint = %d\n", (int)*pint);
+        //get pointer to the shared turn variable ** NECESSARY in master??
+        turn_paddr = (char*)(shmat (shmid_turn, 0, 0) );
+        int * turn = (int*) (turn_paddr);
+        *turn = 420;
+        printf("turn = %d\n", (int)*turn);
+        
+        //create and attach to shared memory for flag array
+        shmid_flagarr = shmget(SHMKEY2, proc_limit*BUFF_SZ, 0777 | IPC_CREAT);
+        printf("shmid_flagarr = %d\n", shmid_flagarr);
+        if (shmid_flagarr == -1) { //terminate if shmget failed
+            perror("Error in shmget");
+            return 1;
+        }
+        //get pointer to the shared flag array ** NECESSARY in master??
+        //flagarr_paddr = (char*)(shmat (shmid_flagarr, 0, 0) );
+        int* array;
+        array = shmat (shmid_flagarr, 0, 0);
+        
+        //flag array access testing
+        printf("master: flag array access testing:\n");
+        for (i=0; i<proc_limit; i++) {
+            array[i] = i;
+            printf("arr[%d]=%d", i, array[i]);
+        }
+        //int * turn = (int*) (flagarr_paddr);
+        //*turn = 420;
+        printf("turn = %d\n", (int)*turn);
+        
         
         //fork producer
         if ( (producerpid = fork()) <0 ){ //terminate code
@@ -117,9 +141,11 @@ int main(int argc, char** argv) {
                 return 1;
             }
             if (consumerpid == 0) { //child code
-                char arg[10];
-                sprintf(arg, "%d", i+1);
-                execlp("./consumer", "./consumer", arg, (char *)NULL);
+                char consumer_num[10];
+                sprintf(consumer_num, "%d", i+1);
+                char max_procs[10];
+                sprintf(max_procs, "%d", proc_limit);
+                execlp("./consumer", "./consumer", consumer_num, max_procs, (char *)NULL);
                 perror("execl() failure on consumer");
                 return 1;
             }
@@ -137,16 +163,21 @@ int main(int argc, char** argv) {
         return 0;
     }
     
-    while ( (wpid = wait(&status)) > 0); //wait for all children to finish
+    //wait for all children to finish
+    while ( (wpid = wait(&status)) > 0);
     
-    //detach shared memory
-    if ( shmdt(paddr) == -1) {
-        perror("shmdt error");
+    //remove shared memory or report via perror and exit
+    if ( shmctl(shmid_turn, IPC_RMID, NULL) == -1) {
+        perror("error removing shared memory");
         return 1;
     }
     
+    if ( shmctl(shmid_flagarr, IPC_RMID, NULL) == -1) {
+        perror("error removing shared memory");
+        return 1;
+    }
+    
+    //if this point is reached, normal shutdown is achieved
     printf("%s: shutting down: normal.\n", argv[0]);
     return 0;
 }
-
-
