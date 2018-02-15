@@ -59,6 +59,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     
+    //if only -n is selected
     else if ( (nflag == 1) && (hflag == 0) ) {
         //if no argument, use default of 10 processes
         if ( argv[2] == NULL ) {
@@ -87,6 +88,7 @@ int main(int argc, char** argv) {
             return 1;
         }
         //get pointer to the shared turn variable ** NECESSARY in master??
+        
         turn_paddr = (char*)(shmat (shmid_turn, 0, 0) );
         int * turn = (int*) (turn_paddr);
         *turn = 420;
@@ -100,20 +102,17 @@ int main(int argc, char** argv) {
             return 1;
         }
         //get pointer to the shared flag array ** NECESSARY in master??
+        
         //flagarr_paddr = (char*)(shmat (shmid_flagarr, 0, 0) );
         int* array;
         array = shmat (shmid_flagarr, 0, 0);
-        
-        //flag array access testing
-        printf("master: flag array access testing:\n");
+       
+        //flag array access testing & assigning dummy numbers
+        printf("master: flag array assignment:\n");
         for (i=0; i<proc_limit; i++) {
             array[i] = i;
-            printf("arr[%d]=%d", i, array[i]);
+            //printf("arr[%d]=%d, ", i, array[i]);
         }
-        //int * turn = (int*) (flagarr_paddr);
-        //*turn = 420;
-        printf("turn = %d\n", (int)*turn);
-        
         
         //fork producer
         if ( (producerpid = fork()) <0 ){ //terminate code
@@ -126,6 +125,7 @@ int main(int argc, char** argv) {
             return 1;
         }
         
+        printf("master: beginning fork loop\n");
         //fork consumer(s), max 18 at a time
         for (i=0; i<n; i++) {
             //printf("i=%d, proc_count=%d\n", i, proc_count);
@@ -151,8 +151,6 @@ int main(int argc, char** argv) {
             }
             //parent code proceeds
             proc_count++;
-            printf("proc_count incremented to %d\n", proc_count);
-            
         }
         
         //END MAIN STUFF_*******************************************************

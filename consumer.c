@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
     int c_num = atoi(argv[1]);
     int proc_limit = atoi(argv[2]);
     int i;
+    printf("consumer %d: sleeping\n", c_num);
     sleep(2);
     
     //access shared memory for turn variable
@@ -46,7 +47,7 @@ int main(int argc, char** argv) {
     //flag array access testing
     printf("consumer %d: flag array access testing:\n", c_num);
     for (i=0; i<proc_limit; i++) {
-            printf("flag[%d]=%d", i, flag[i]);
+            printf("flag[%d]=%d, ", i, flag[i]);
         }
     printf("\n");
     
@@ -55,9 +56,9 @@ int main(int argc, char** argv) {
     int * turn = (int*) (paddr);
     *turn = c_num + 420;
     
-    printf("consumer %d launched. pid=%ld shmid_turn=%d turn=%d\n", c_num, getpid(), shmid_turn, (int)*turn);
+    //printf("consumer %d launched. pid=%ld shmid_turn=%d turn=%d\n", c_num, getpid(), shmid_turn, (int)*turn);
     
-    printf("consumer %d shutting down. pid: %ld\n", c_num, getpid());
-    return (EXIT_SUCCESS);
+    printf("consumer %d terminated: normal. pid: %ld\n", c_num, getpid());
+    return 1;
 }
 
