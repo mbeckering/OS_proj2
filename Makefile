@@ -1,7 +1,7 @@
 all: master producer consumer
 
 master: master.c
-	gcc -o master master.c
+	gcc -lrt -o master master.c
 	
 producer: producer.c
 	gcc -o producer producer.c
