@@ -46,8 +46,6 @@ int main(int argc, char** argv) {
         perror("Error in shmget for bufflags");
         return 1;
     }
-    //char * paddr = (char*) shmat(shmid_bufflags, 0, 0);
-    //int* buf_flags = (int*)(paddr);
     int* buf_flags;
     buf_flags = shmat(shmid_bufflags, 0, 0);
 
@@ -105,50 +103,60 @@ int main(int argc, char** argv) {
     
     int doloop = 0;
     int forloop = 0;
+    int allfull = 0;
     //enum state {empty, full};
     
-    while (fgets(strin, 99, fp) != NULL) { //if a buffer is free, fill it
-        printf("doloop %d, strin=%s\n", doloop, strin);
+    if (fgets(strin, 99, fp) == NULL) {
+        printf("Producer: Error: strings.data is empty\n");
+    }
+    
+    while (1) {
+        while(1){
+            allfull = 1;
+            for (i=0; i<5; i++) {
+                if (buf_flags[i] == 0) {
+                    allfull = 0;
+                }
+            }
+            if (allfull == 1) {
+                 randomTime = rand() %3 + 1;
+                 printf("All buffers full. Producer sleeping %d sec...\n", randomTime);
+                 sleep(randomTime);
+            }
+            else if (allfull == 0) {
+                break;
+            }
+        }
+        
             if (buf_flags[0] == 0) {//if buffer 0 is open
-                printf("inbuf0\n");
-                buf_flags[0] = 1;
                 sprintf(buf0, "%s", strin);
-                printf("buf0 is now: %s. fgetting...", buf0);
+                buf_flags[0] = 1;
                 if (fgets(strin, 99, fp) == NULL)
                     break;
-                printf("buf0 is now: %s. strin is now: %s", buf0, strin);
             }
-            if ( (buf_flags[1] == 0)) {
-                printf("inbuf1\n");
-                buf_flags[1] = 1;
+            if (buf_flags[1] == 0) {
                 sprintf(buf1, "%s", strin);
+                buf_flags[1] = 1;
                 if (fgets(strin, 99, fp) == NULL)
                     break;
-                printf("buf1 is now: %s. strin is now: %s", buf1, strin);
             }
-            if ( (buf_flags[2] == 0)) {
-                printf("inbuf2\n");
-                buf_flags[2] = 1;
+            if (buf_flags[2] == 0) {
                 sprintf(buf2, "%s", strin);;
+                buf_flags[2] = 1;
                 if (fgets(strin, 99, fp) == NULL)
                     break;
-                printf("buf2 is now: %s. strin is now: %s", buf2, strin);
             }
-            if ( (buf_flags[3] == 0)) {
-                printf("inbuf3\n");
-                buf_flags[3] = 1;
+            if (buf_flags[3] == 0) {
                 sprintf(buf3, "%s", strin);
+                buf_flags[3] = 1;
                 if (fgets(strin, 99, fp) == NULL)
                     break;
-                printf("strin is now: %s", strin);
             }
-            if ( (buf_flags[4] == 0) ) {
-                printf("inbuf4\n");
-                buf_flags[4] = 1;
+            if (buf_flags[4] == 0) {
                 sprintf(buf4, "%s", strin);
+                buf_flags[4] = 1;
                 if (fgets(strin, 99, fp) == NULL)
                     break;
-                printf("strin is now: %s", strin);
             }
         doloop++;
     }
@@ -158,12 +166,13 @@ int main(int argc, char** argv) {
     buf2 = "test2";
     buf3 = "test3";
     buf4 = "test4";
-    */
+    
     printf("buf_flags[0] = %d, buf0 = %s", buf_flags[0], buf0);
     printf("buf_flags[1] = %d, buf1 = %s", buf_flags[1], buf1);
     printf("buf_flags[2] = %d, buf2 = %s", buf_flags[2], buf2);
     printf("buf_flags[3] = %d, buf3 = %s", buf_flags[3], buf3);
     printf("buf_flags[4] = %d, buf4 = %s", buf_flags[4], buf4);
+    */
         
     printf("producer: EoF reached, terminating. pid: %ld\n", getpid());
 

@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     pid_t consumerpid, wpid; //pid holders
     char consumer_num[10]; //string for holding arg1 for exec calls
     char total_procs[10]; //string for holding arg2 for exec calls
-    double MAXTIME = 30.0; //max timeout for master
+    double MAXTIME = 100.0; //max timeout for master
     
     // Set up interrupt handler
     signal (SIGINT, siginthandler);
@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
         int *turn = (int*) shmat(shmid_turn, 0, 0);
         *turn = 0; //WRITING INTO SHARED AREA
         //create and attach to shared memory for flag array before forking
-        shmid_flagarr = shmget(SHMKEY_FLAGARR, n*BUFF_SZ, 0777 | IPC_CREAT);
+        shmid_flagarr = shmget(SHMKEY_FLAGARR, 20, 0777 | IPC_CREAT);
         if (shmid_flagarr == -1) { //terminate if shmget failed
             perror("Error in shmget");
             return 1;
