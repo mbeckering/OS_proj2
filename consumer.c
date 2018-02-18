@@ -11,6 +11,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <string.h>
+#include <time.h>
 
 #define SHMKEY_BUFFLAGS 0425000
 #define SHMKEY_TURN 04251
@@ -22,6 +23,8 @@
 #define SHMKEY_buf4 04257
 #define BUFF_SZ sizeof (int)
 
+char *getTime(void);
+
 /*
  * 
  */
@@ -31,8 +34,20 @@ int main(int argc, char** argv) {
     int c_total = atoi(argv[2]);
     int i;
     int shmid_buf0, shmid_buf1, shmid_buf2, shmid_buf3, shmid_buf4;
+    int seed = (me+1);
     
-    printf("consumer %d launched. total consumers=%d\n", me+1, c_total);
+    //create log file
+    FILE *clog;
+    char logname[20];
+    sprintf(logname, "consumer%d.log", me+1); //build log file name
+    clog = fopen(logname, "w");
+    if (clog == NULL) {
+        perror("producer: error opening log file");
+        return -1;
+    }
+    //write launch to log file
+    fprintf(clog, "%s ", getTime());
+    fprintf(clog, "Started\n");
     
     //access shared memory for turn variable (int)
     int shmid_turn = shmget(SHMKEY_TURN, BUFF_SZ, 0777);
@@ -43,7 +58,7 @@ int main(int argc, char** argv) {
     int *turn = (int*) shmat(shmid_turn, 0, 0);
     
     //access to shared memory for flag array
-    int shmid_flagarr = shmget(SHMKEY_FLAGARR, 20, 0777);
+    int shmid_flagarr = shmget(SHMKEY_FLAGARR, 24, 0777);
     if (shmid_flagarr == -1) { //terminate if shmget failed
         perror("Error in shmget");
         return 1;
@@ -124,23 +139,28 @@ int main(int argc, char** argv) {
         *turn = me;
         //***CRITICAL SECTION HERE***
         if (buf_flags[0] == 1) {
-            printf("consumer %d: emptying buffer 0 of %s", me+1, buf0);
+            fprintf(clog, "%s ", getTime());
+            fprintf(clog, "Read 0 %s",  buf0);
             buf_flags[0] = 0;
         }
         else if (buf_flags[1] == 1) {
-            printf("consumer %d: emptying buffer 1 of %s", me+1, buf1);
+            fprintf(clog, "%s ", getTime());
+            fprintf(clog, "Read 1 %s", buf1);
             buf_flags[1] = 0;
         }
         else if (buf_flags[2] == 1) {
-            printf("consumer %d: emptying buffer 2 of %s", me+1, buf2);
+            fprintf(clog, "%s ", getTime());
+            fprintf(clog, "Read 2 %s", buf2);
             buf_flags[2] = 0;
         }
         else if (buf_flags[3] == 1) {
-            printf("consumer %d: emptying buffer 3 of %s", me+1, buf3);
+            fprintf(clog, "%s ", getTime());
+            fprintf(clog, "Read 3 %s", buf3);
             buf_flags[3] = 0;
         }
         else if (buf_flags[4] == 1) {
-            printf("consumer %d: emptying buffer 4 of %s", me+1, buf4);
+            fprintf(clog, "%s ", getTime());
+            fprintf(clog, "Read 4 %s", buf4);
             buf_flags[4] = 0;
         }
         //else printf("Consumer %d: All buffers are empty. ", me+1);
@@ -155,13 +175,30 @@ int main(int argc, char** argv) {
         flag[me] = idle;
         
         //remainder section: sleepy time
-        srand((me+1)*13);
+        seed = (seed*82647 + 19374);
+        srand(seed);
         randomTime = rand() %5 + 1;
-        printf("Consumer %d: sleeping %d sec...\n",me+1, randomTime);
+        fprintf(clog, "%s ", getTime());
+        fprintf(clog, "Sleep %d\n", randomTime);
         sleep(randomTime);
-    } while (1);
+    } while (flag[5] !=9); //flag[5] is set to 9 by producer when EoF is reached
     
-    printf("consumer %d terminated: finished. pid: %ld\n", me+1, getpid());
+    fprintf(clog, "%s ", getTime());
+    fprintf(clog, "Terminated: Normal\n");
     return 1;
 }
 
+//this function pulled from stackoverflow but edited for output format
+char *getTime(void) {
+    
+    time_t rawtime;
+    struct tm* timeinfo;
+    
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    
+    static char _retval[20];
+    strftime(_retval, sizeof(_retval), "%H:%M:%S", timeinfo);
+    
+    return _retval;
+}

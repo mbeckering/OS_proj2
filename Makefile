@@ -10,4 +10,4 @@ consumer: consumer.c
 	gcc -o consumer consumer.c
 	
 clean:
-	rm master producer consumer
+	rm master producer consumer *.log

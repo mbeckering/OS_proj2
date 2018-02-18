@@ -11,6 +11,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <string.h>
+#include <time.h>
 
 #define SHMKEY_BUFFLAGS 0425000
 #define SHMKEY_TURN 04251
@@ -25,22 +26,41 @@
 /*
  * 
  */
+char *getTime(void);
+
 int main(int argc, char** argv) {
-    printf("producer launched: pid: %ld\n", getpid());
     int randomTime, i;
     int shmid_buf0, shmid_buf1, shmid_buf2, shmid_buf3, shmid_buf4;
     char strin[100];
-    FILE *fp;
     
     //set file pointer to strings.data
+    FILE *fp;
     fp = fopen("strings.data", "r");
     if (fp == NULL) {
-        perror("producer: error opening file");
+        perror("producer: error opening data file");
         return -1;
     }
+    //create log file
+    FILE *plog;
+    plog = fopen("prod.log", "w");
+    if (plog == NULL) {
+        perror("producer: error opening log file");
+        return -1;
+    }
+    //write launch to log file
+    fprintf(plog, "%s ", getTime());
+    fprintf(plog, "Started\n");
+    
+    //access to shared memory for flag array
+    int shmid_flagarr = shmget(SHMKEY_FLAGARR, 24, 0777);
+    if (shmid_flagarr == -1) { //terminate if shmget failed
+        perror("Error in shmget");
+        return 1;
+    }
+    int* flag;
+    flag = shmat(shmid_flagarr, 0, 0);
     
     //set up shared memory for bufflags
-    
     int shmid_bufflags = shmget(SHMKEY_BUFFLAGS, 5*BUFF_SZ, 0777);
     if (shmid_bufflags == -1) { //terminate if shmget failed
         perror("Error in shmget for bufflags");
@@ -48,14 +68,7 @@ int main(int argc, char** argv) {
     }
     int* buf_flags;
     buf_flags = shmat(shmid_bufflags, 0, 0);
-
-    //initialize buffer flags to 0 (empty)
-    /*
-    for (i=0; i<5; i++) {
-        buf_flags[i] = 0;
-        printf("producer: bufflags[%d] = %d\n", i, buf_flags[i]);
-    }
-    */
+    
     //get shared memory locations for buffers
     shmid_buf0 = shmget(SHMKEY_buf0, 100, 0777);
     if (shmid_buf0 == -1) { //terminate if shmget failed
@@ -93,26 +106,20 @@ int main(int argc, char** argv) {
     char* buf4;
     buf4 = shmat(shmid_buf4, 0, 0);
     
-    /*
-    if ( fgets(strin, 99, fp) == NULL) {
-        printf("producer: Error: strings.data is empty\n");
-        return 1;
-    }
-    printf("strin set to: %s\n", strin);
-     * */
-    
     int doloop = 0;
     int forloop = 0;
     int allfull = 0;
     //enum state {empty, full};
     
     if (fgets(strin, 99, fp) == NULL) {
-        printf("Producer: Error: strings.data is empty\n");
+        printf("Producer: Error: strings.data is empty \n");
     }
     
     while (1) {
         while(1){
             allfull = 1;
+            fprintf(plog, "%s ", getTime());
+            fprintf(plog, "Check\n");
             for (i=0; i<5; i++) {
                 if (buf_flags[i] == 0) {
                     allfull = 0;
@@ -120,7 +127,8 @@ int main(int argc, char** argv) {
             }
             if (allfull == 1) {
                  randomTime = rand() %3 + 1;
-                 printf("All buffers full. Producer sleeping %d sec...\n", randomTime);
+                 fprintf(plog, "%s ", getTime());
+                 fprintf(plog, "Sleep %d\n", randomTime);
                  sleep(randomTime);
             }
             else if (allfull == 0) {
@@ -131,114 +139,68 @@ int main(int argc, char** argv) {
             if (buf_flags[0] == 0) {//if buffer 0 is open
                 sprintf(buf0, "%s", strin);
                 buf_flags[0] = 1;
+                fprintf(plog, "%s ", getTime());
+                fprintf(plog, "Write 0 %s", strin);
                 if (fgets(strin, 99, fp) == NULL)
                     break;
             }
             if (buf_flags[1] == 0) {
                 sprintf(buf1, "%s", strin);
                 buf_flags[1] = 1;
+                fprintf(plog, "%s ", getTime());
+                fprintf(plog, "Write 1 %s", strin);
                 if (fgets(strin, 99, fp) == NULL)
                     break;
             }
             if (buf_flags[2] == 0) {
                 sprintf(buf2, "%s", strin);;
                 buf_flags[2] = 1;
+                fprintf(plog, "%s ", getTime());
+                fprintf(plog, "Write 2 %s", strin);
                 if (fgets(strin, 99, fp) == NULL)
                     break;
             }
             if (buf_flags[3] == 0) {
                 sprintf(buf3, "%s", strin);
                 buf_flags[3] = 1;
+                fprintf(plog, "%s ", getTime());
+                fprintf(plog, "Write 3 %s", strin);
                 if (fgets(strin, 99, fp) == NULL)
                     break;
             }
             if (buf_flags[4] == 0) {
                 sprintf(buf4, "%s", strin);
                 buf_flags[4] = 1;
+                fprintf(plog, "%s ", getTime());
+                fprintf(plog, "Write 4 %s", strin);
                 if (fgets(strin, 99, fp) == NULL)
                     break;
             }
         doloop++;
     }
-    /*
-    buf0 = "test0";
-    buf1 = "test1";
-    buf2 = "test2";
-    buf3 = "test3";
-    buf4 = "test4";
-    
-    printf("buf_flags[0] = %d, buf0 = %s", buf_flags[0], buf0);
-    printf("buf_flags[1] = %d, buf1 = %s", buf_flags[1], buf1);
-    printf("buf_flags[2] = %d, buf2 = %s", buf_flags[2], buf2);
-    printf("buf_flags[3] = %d, buf3 = %s", buf_flags[3], buf3);
-    printf("buf_flags[4] = %d, buf4 = %s", buf_flags[4], buf4);
-    */
-        
-    printf("producer: EoF reached, terminating. pid: %ld\n", getpid());
+    fprintf(plog, "%s ", getTime());
+    fprintf(plog, "Sleep 6\n");
+    sleep(6);//sleep long enough to ensure consumers clear all 5 buffers
+    flag[5] = 9;//signal to consumers that EoF has been reached
+    fprintf(plog, "%s ", getTime());
+    fprintf(plog, "Terminated Normal\n");
+    fclose(plog);
+    fclose(fp);
 
     return (EXIT_SUCCESS);
 }
-/*
-for (i=0; i<5; i++) { //if a buffer is free, fill it
-            
-            if (buf_flags[i] == 0) {//if buffer 0 is open
-                
-            }
-            /*
-            else if ( (buf_flags[i] == 0) && (i == 1) ) {
-                buf_flags[i] = 1;
-                buf1 = strin;
-            }
-            else if ( (buf_flags[i] == 0) && (i == 2) ) {
-                buf_flags[i] = 1;
-                buf2 = strin;
-            }
-            else if ( (buf_flags[i] == 0) && (i == 3) ) {
-                buf_flags[i] = 1;
-                buf3 = strin;
-            }
-            else if ( (buf_flags[i] == 0) && (i == 4) ) {
-                buf_flags[i] = 1;
-                buf4 = strin;
-            }
-            
-            else printf("producer: no empty buffers\n");
-             * */
-/*
-do { //read & loop until EoF
-        if (buf_flags[0] == 0) {
-            buf0 = strin;
-            buf_flags[0] = 1;
-            printf("buf4=%s", buf4);
-            if ( fgets(strin, 99, fp) == NULL)
-                break;
-        }
-        if (buf_flags[1] == 0) {
-            buf1 = strin;
-            buf_flags[1] = 1;
-            if ( fgets(strin, 99, fp) == NULL)
-                break;
-        }
-        if (buf_flags[2] == 0) {
-            buf2 = strin;
-            buf_flags[2] = 1;
-            if ( fgets(strin, 99, fp) == NULL)
-                break;
-        }
-        if (buf_flags[3] == 0) {
-            buf3 = strin;
-            buf_flags[3] = 1;
-            if ( fgets(strin, 99, fp) == NULL)
-                break;
-        }
-        if (buf_flags[4] == 0) {
-            buf4 = strin;
-            buf_flags[4] = 1;
-            if ( fgets(strin, 99, fp) == NULL)
-                break;
-        }
-            randomTime = rand() %2 + 1;
-            printf("Producer sleeping %d sec...\n", randomTime);
-            sleep(randomTime);
-        } while (fgets(strin, 99, fp) != NULL);
- */
+
+//this function pulled from stackoverflow but edited for output format
+char *getTime(void) {
+    
+    time_t rawtime;
+    struct tm* timeinfo;
+    
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    
+    static char _retval[20];
+    strftime(_retval, sizeof(_retval), "%H:%M:%S", timeinfo);
+    
+    return _retval;
+}

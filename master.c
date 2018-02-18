@@ -98,12 +98,11 @@ int main(int argc, char** argv) {
         //if no argument, use default of 10 processes
         if ( argv[2] == NULL ) {
             n = 10;
-            printf("%s: Proceeding with default of %d consumer processes\n",
-                    argv[0], n);
+            printf("%s: Executing with default of %d consumer processes...\n", argv[0], n);
         }
         //continue with argument if it's positive
         else if (( n = atoi(argv[2])) >= 1 && n <= 18) {
-            printf("%s: Proceeding with %d consumer processes\n",
+            printf("%s: Executing with %d consumer processes...\n",
                     argv[0], n);
         }
         //otherwise exit with error message
@@ -124,7 +123,7 @@ int main(int argc, char** argv) {
         int *turn = (int*) shmat(shmid_turn, 0, 0);
         *turn = 0; //WRITING INTO SHARED AREA
         //create and attach to shared memory for flag array before forking
-        shmid_flagarr = shmget(SHMKEY_FLAGARR, 20, 0777 | IPC_CREAT);
+        shmid_flagarr = shmget(SHMKEY_FLAGARR, 24, 0777 | IPC_CREAT);
         if (shmid_flagarr == -1) { //terminate if shmget failed
             perror("Error in shmget");
             return 1;
@@ -210,7 +209,7 @@ int main(int argc, char** argv) {
     clearShm();
     
     //if this point is reached, normal shutdown is achieved
-    printf("%s: shutting down\n", argv[0]);
+    printf("%s: Terminated\n", argv[0]);
     return 0;
 }
 
@@ -294,7 +293,6 @@ void siginthandler(int sig_num) {
     kill(producerpid, SIGINT);
     for (i=0; i<n; i++) {
         kill(childpids[i], SIGINT);
-        printf("killing %ld\n", childpids[i]);
     }
     //wait for all children to finish
     while ( (sh_wpid = wait(&sh_status)) > 0);
