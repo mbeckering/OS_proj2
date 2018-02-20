@@ -5,12 +5,16 @@
  * Created on February 13, 2018, 10:10 AM
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <string.h>
+#include <signal.h>
 #include <time.h>
 
 #define SHMKEY_BUFFLAGS 0425000
@@ -24,6 +28,11 @@
 #define BUFF_SZ sizeof (int)
 
 char *getTime(void);
+static FILE *clog; //consuemr log
+static FILE *mlog; //master log
+
+static int setinterrupt();
+void siginthandler(int sig_num);
 
 /*
  * 
@@ -36,15 +45,24 @@ int main(int argc, char** argv) {
     int shmid_buf0, shmid_buf1, shmid_buf2, shmid_buf3, shmid_buf4;
     int seed = (me+1);
     
-    //create log file
-    FILE *clog;
+    //set up sigint handler
+    signal (SIGINT, siginthandler);
+    
+    //create log files
     char logname[20];
-    sprintf(logname, "consumer%d.log", me+1); //build log file name
+    sprintf(logname, "cons%d.log", me+1); //build log file name
     clog = fopen(logname, "w");
     if (clog == NULL) {
         perror("producer: error opening log file");
         return -1;
     }
+    
+    mlog = fopen("master.log", "a");
+        if (mlog == NULL) {
+            perror("producer: error opening log file");
+            return -1;
+        }
+    
     //write launch to log file
     fprintf(clog, "%s ", getTime());
     fprintf(clog, "Started\n");
@@ -138,33 +156,40 @@ int main(int argc, char** argv) {
         //assign turn to self and enter party zone
         *turn = me;
         //***CRITICAL SECTION HERE***
+        fprintf(clog, "%s ", getTime());
+        fprintf(clog, "Check\n",  buf0);
         if (buf_flags[0] == 1) {
             fprintf(clog, "%s ", getTime());
             fprintf(clog, "Read 0 %s",  buf0);
+            fprintf(mlog, "%ld %d %s", getpid(), me, buf0);
             buf_flags[0] = 0;
         }
         else if (buf_flags[1] == 1) {
             fprintf(clog, "%s ", getTime());
             fprintf(clog, "Read 1 %s", buf1);
+            fprintf(mlog, "%ld %d %s", getpid(), me, buf1);
             buf_flags[1] = 0;
         }
         else if (buf_flags[2] == 1) {
             fprintf(clog, "%s ", getTime());
             fprintf(clog, "Read 2 %s", buf2);
             buf_flags[2] = 0;
+            fprintf(mlog, "%ld %d %s", getpid(), me, buf2);
         }
         else if (buf_flags[3] == 1) {
             fprintf(clog, "%s ", getTime());
             fprintf(clog, "Read 3 %s", buf3);
+            fprintf(mlog, "%ld %d %s", getpid(), me, buf3);
             buf_flags[3] = 0;
         }
         else if (buf_flags[4] == 1) {
             fprintf(clog, "%s ", getTime());
             fprintf(clog, "Read 4 %s", buf4);
+            fprintf(mlog, "%ld %d %s", getpid(), me, buf4);
             buf_flags[4] = 0;
         }
-        //else printf("Consumer %d: All buffers are empty. ", me+1);
-        
+        //ensure info is saved in master.log before leaving crit section
+        fflush(mlog);
         //exit section
         j = (*turn + 1) % c_total;
         while (flag[j] == idle)
@@ -185,6 +210,8 @@ int main(int argc, char** argv) {
     
     fprintf(clog, "%s ", getTime());
     fprintf(clog, "Terminated: Normal\n");
+    fclose(clog);
+    fclose(mlog);
     return 1;
 }
 
@@ -201,4 +228,17 @@ char *getTime(void) {
     strftime(_retval, sizeof(_retval), "%H:%M:%S", timeinfo);
     
     return _retval;
+}
+
+//SIGINT handler
+void siginthandler(int sig_num) {
+    int sh_status, i;
+    pid_t sh_wpid;
+    
+    //print to log, close file and shut down
+    fprintf(clog, "%s ", getTime());
+    fprintf(clog, "Terminated Interrupted\n");
+    fclose(clog);
+    fclose(mlog);
+    exit(0);
 }

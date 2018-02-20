@@ -40,6 +40,7 @@ pid_t producerpid;
 int n;
 int shmid_turn, shmid_flagarr, shmid_buf1, shmid_buf2,
             shmid_buf3, shmid_buf4, shmid_buf5, shmid_bufflags; //shmid holders
+static FILE *mlog; //master log
 /*
  * 
  */
@@ -112,6 +113,12 @@ int main(int argc, char** argv) {
         }
         
         //THE GOOD STUFF********************************************************
+        
+        mlog = fopen("master.log", "w");
+        if (mlog == NULL) {
+            perror("producer: error opening log file");
+            return -1;
+        }
         
         //create and attach to shared memory for turn variable before forking
         shmid_turn = shmget(SHMKEY_TURN, BUFF_SZ, 0777 | IPC_CREAT);
@@ -203,10 +210,11 @@ int main(int argc, char** argv) {
     
     //wait for all children to finish
     while ( (wpid = wait(&status)) > 0);
+    printf("master: All children terminated\n");
     
     //clear shared memory
-    printf("master: Clearing shared memory...\n");
     clearShm();
+    fclose(mlog);
     
     //if this point is reached, normal shutdown is achieved
     printf("%s: Terminated\n", argv[0]);
@@ -215,6 +223,7 @@ int main(int argc, char** argv) {
 
 void clearShm() {
     //remove shared memory for turn variable or report via perror and exit
+    printf("master: Clearing shared memory...\n");
     if ( shmctl(shmid_turn, IPC_RMID, NULL) == -1) {
         perror("error removing shared memory");
     }
@@ -282,7 +291,15 @@ static void interrupt(int signo, siginfo_t *info, void *context) {
         kill(childpids[i], SIGINT);
         printf("killing %ld\n", childpids[i]);
     }
-    //clearShm();
+    //wait for all children to finish
+    while ( (sh_wpid = wait(&sh_status)) > 0);
+    
+    printf("master: All children terminated\n");
+    clearShm();
+    
+    fclose(mlog);
+    printf("master: Terminated: Timed Out\n");
+    exit(0);
 }
 
 void siginthandler(int sig_num) {
@@ -296,5 +313,11 @@ void siginthandler(int sig_num) {
     }
     //wait for all children to finish
     while ( (sh_wpid = wait(&sh_status)) > 0);
-    //clearShm();
+    fclose(mlog);
+    
+    printf("master: All children terminated\n");
+    clearShm();
+    
+    printf("master: Terminated: Interrupted\n");
+    exit(0);
 }

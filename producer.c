@@ -12,6 +12,7 @@
 #include <sys/shm.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
 
 #define SHMKEY_BUFFLAGS 0425000
 #define SHMKEY_TURN 04251
@@ -26,22 +27,26 @@
 /*
  * 
  */
+void siginthandler(int sig_num);
 char *getTime(void);
+static FILE *fp; //pointer to input file
+static FILE *plog; //pointer to log file
 
 int main(int argc, char** argv) {
     int randomTime, i;
     int shmid_buf0, shmid_buf1, shmid_buf2, shmid_buf3, shmid_buf4;
     char strin[100];
     
+    //set up sigint handler
+    signal (SIGINT, siginthandler);
+    
     //set file pointer to strings.data
-    FILE *fp;
     fp = fopen("strings.data", "r");
     if (fp == NULL) {
         perror("producer: error opening data file");
         return -1;
     }
     //create log file
-    FILE *plog;
     plog = fopen("prod.log", "w");
     if (plog == NULL) {
         perror("producer: error opening log file");
@@ -178,6 +183,7 @@ int main(int argc, char** argv) {
             }
         doloop++;
     }
+    printf("producer: End of file reached...\n");
     fprintf(plog, "%s ", getTime());
     fprintf(plog, "Sleep 6\n");
     sleep(6);//sleep long enough to ensure consumers clear all 5 buffers
@@ -203,4 +209,17 @@ char *getTime(void) {
     strftime(_retval, sizeof(_retval), "%H:%M:%S", timeinfo);
     
     return _retval;
+}
+
+//SIGINT handler
+void siginthandler(int sig_num) {
+    int sh_status, i;
+    pid_t sh_wpid;
+    
+    //print to log, close file and shut down
+    fprintf(plog, "%s ", getTime());
+    fprintf(plog, "Terminated Interrupted\n");
+    fclose(plog);
+    fclose(fp);
+    exit(0);
 }
