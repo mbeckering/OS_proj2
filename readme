@@ -1,3 +1,5 @@
+https://github.com/mbeckering/OS_proj2
+
 Use: ./master -n <1 to 18>
 
 ./parse.bash <logname.log>
